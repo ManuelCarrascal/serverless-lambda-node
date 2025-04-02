@@ -1,9 +1,11 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
+const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 const { v4: uuidv4 } = require("uuid");
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
+const sqsClient = new SQSClient({});
 
 exports.createUser = async (event) => {
   try {
@@ -22,6 +24,14 @@ exports.createUser = async (event) => {
       TableName: process.env.USERS_TABLE,
       Item: { id, name, email }
     }));
+    // Enviar mensaje a SQS para que otra Lambda lo procese
+    const sqsParams = {
+      QueueUrl: process.env.SQS_QUEUE_URL, // 🔹 Asegúrate de definir esta variable en el `serverless.yml`
+      MessageBody: JSON.stringify({ id, name, email })
+    };
+
+    await sqsClient.send(new SendMessageCommand(sqsParams));
+
 
     return {
       statusCode: 201,

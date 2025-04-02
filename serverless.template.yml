@@ -1,14 +1,16 @@
-org: your-org-name
-app: your-app-name
-service: node-serverless
+org: ${param:org}
+app: ${param:app}
+service: ${param:service}
 
 provider:
   name: aws
   runtime: nodejs20.x
-  region: your-region
-  stage: dev
+  region: ${param:region}
+  stage: ${param:stage}
   environment:
     USERS_TABLE: ${self:service}-${self:provider.stage}-users
+    SQS_QUEUE_URL: !Ref UsersQueue
+    SNS_TOPIC_ARN: !Ref UserSNSTopic
   iam:
     role:
       statements:
@@ -25,8 +27,21 @@ provider:
           Action:
             - lambda:InvokeFunction
           Resource:
-           - arn:aws:lambda:${self:provider.region}:YOUR_ACCOUNT_ID:function:${self:service}-${self:provider.stage}-getUser
-           - arn:aws:lambda:${self:provider.region}:YOUR_ACCOUNT_ID:function:${self:service}-${self:provider.stage}-createUser
+            - arn:aws:lambda:${self:provider.region}:${param:accountId}:function:${self:service}-${self:provider.stage}-getUser
+            - arn:aws:lambda:${self:provider.region}:${param:accountId}:function:${self:service}-${self:provider.stage}-createUser
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+          Resource: !GetAtt UsersQueue.Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+          Resource: !GetAtt UsersQueue.Arn
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource: !Ref UserSNSTopic
 
 functions:
   getUser:
@@ -45,6 +60,12 @@ functions:
           method: post
           private: false
 
+  sendEmail:
+    handler: handlers/handlerSendEmail.sendEmail
+    events:
+      - sqs:
+          arn: !GetAtt UsersQueue.Arn
+
 resources:
   Resources:
     UsersTable:
@@ -58,3 +79,21 @@ resources:
           - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+    
+    UsersQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-queue
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt UsersDLQ.Arn
+          maxReceiveCount: 3
+    
+    UsersDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-dlq
+    
+    UserSNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-${self:provider.stage}-notifications
