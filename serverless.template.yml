@@ -1,0 +1,60 @@
+org: your-org-name
+app: your-app-name
+service: node-serverless
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: your-region
+  stage: dev
+  environment:
+    USERS_TABLE: ${self:service}-${self:provider.stage}-users
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+            - dynamodb:Query
+          Resource: !GetAtt UsersTable.Arn
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource:
+           - arn:aws:lambda:${self:provider.region}:YOUR_ACCOUNT_ID:function:${self:service}-${self:provider.stage}-getUser
+           - arn:aws:lambda:${self:provider.region}:YOUR_ACCOUNT_ID:function:${self:service}-${self:provider.stage}-createUser
+
+functions:
+  getUser:
+    handler: handlers/handlerGet.getUser
+    events:
+      - http:
+          path: user
+          method: get
+          private: false
+
+  createUser:
+    handler: handlers/handlerPost.createUser
+    events:
+      - http:
+          path: user
+          method: post
+          private: false
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-users
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST

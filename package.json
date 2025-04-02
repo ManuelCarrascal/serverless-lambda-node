@@ -1,0 +1,20 @@
+{
+  "name": "apirest-users",
+  "version": "1.0.0",
+  "description": "API REST para manejar usuarios con Serverless Framework y AWS DynamoDB",
+  "main": "handler.js",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "remove": "serverless remove"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.x.x",
+    "@aws-sdk/lib-dynamodb": "^3.x.x",
+    "uuid": "^8.0.0"
+
+  },
+  "devDependencies": {
+    "serverless": "^3.36.0"
+  },
+  "license": "MIT"
+}
